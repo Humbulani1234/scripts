@@ -1,0 +1,104 @@
+
+<!DOCTYPE html>
+<html>
+
+<body>
+
+    <style>
+        
+        .mybtn {
+
+           background-color: whitesmoke;
+           text-align: center;
+    /*       display: inline-block;*/
+           font-size: 15px;
+           cursor: pointer;
+           padding: 5px 8px;
+           border:2px solid #000;
+           border-radius: 30px;
+           text-decoration: none;
+           color: #000;
+           box-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+           font-weight: bold;
+           transition: box-shadow 0.3s ease;
+        }
+
+        .c {
+
+            padding-left: 20px;
+        }
+
+        .e {
+
+            padding-right: 20px;
+        }
+
+        .f {
+
+            margin-left: 10%;
+        }
+
+        .g {
+
+            margin-left: 25%;
+
+        }
+
+        .d {
+
+            display: flex;
+            justify-content: space-between;
+            background-color: white;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.5);
+            margin-top: 25%;
+            margin-left: 25%;
+            margin-right: 25%;
+            animation: changeColor 2s infinite alternate;
+        }
+
+        @keyframes changeColor {
+        from {
+          background-color: white;
+        }
+        to {
+          background-color: skyblue;
+        }
+      }
+
+    </style>
+
+    <div class="d">
+
+        <div class="c">
+
+            <div style="color:blue;">
+                <h3 class="center-link">Choose a Model</h3>
+            </div>
+            <!-- <span class="center-link"><a href="http://ec2-13-244-95-66.af-south-1.compute.amazonaws.com/Logistic" target="_self" title="Visit Logistic"><button class="mybtn">Enter Logistic Regression</button></a></span> -->
+            <span class="center-link"><a href="http://localhost:8000/Logistic" target="_self" title="Visit Logistic"><button class="mybtn">Enter Logistic Regression</button></a></span>
+            <legend></legend>
+            <!-- <span class="center-link"><a href="http://ec2-13-244-95-66.af-south-1.compute.amazonaws.com/Decision" target="_self" title="Visit Decision"><button class="mybtn">Enter Decision Tree</button></a></span> -->
+            <span class="center-link"><a href="http://localhost:8000/Decision" target="_self" title="Visit Logistic"><button class="mybtn f">Enter Decision Tree</button></a></span>
+            <legend></legend>
+            <span class="center-link"><a href="https://classdeployedpy-bjw4uzjdm5ezhumufi2t2e.streamlit.app/" target="_self" title="Visit Streamlit"><button class="mybtn g">Streamlit</button></a></span>
+
+        </div>
+
+        <div class="vertical-line"></div>
+
+        <div class="e">
+
+            <div style="color:blue;">
+                <h4 class="center-link">GitHub Repos</h4>
+            </div>
+            <span class="center-link"><a href="https://github.com/Humbulani1234/Django_Anyway/" target="_self" title="Visit Logistic"><button class="mybtn">Enter Credit PD repository</button></a></span>
+            <legend></legend>
+            <span class="center-link"><a href="https://github.com/Humbulani1234/Streamlit/" target="_self" title="Visit Decision"><button class="mybtn">Streamlit PD repo</button></a></span>
+            <legend></legend>
+            <span class="center-link"><a href="https://gitfront.io/r/Humbulani/21772ff35fd550f95e800f6a616cd08ba6b9183b/Real-Analysis-and-Measure-theory/" target="_self" title="Visit Streamlit"><button class="mybtn">Real analysis</button></a></span>
+
+        </div>
+    </div>
+
+</body>
+</html>
