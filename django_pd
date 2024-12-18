@@ -1,0 +1,63 @@
+
+server {
+
+    listen 80;
+    server_name 13.245.13.44;
+
+    location / {
+        alias /home/ubuntu/django-pd/django_ref/static/;
+        expires 30d;
+
+       location /static/ {
+
+              alias /home/ubuntu/django-pd/django_ref/static/;
+              expires 30d;
+        }
+
+        proxy_pass http://unix:/home/ubuntu/django-pd/django_ref/app.sock;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 400s;
+        proxy_send_timeout 400s;
+        proxy_read_timeout 400s;
+
+        proxy_cache my_cache;
+        proxy_cache_valid 200 302 180m;
+        proxy_cache_valid 404 1m;
+        proxy_cache_use_stale updating;
+    }
+
+   location /carwash/ {
+        alias /home/ubuntu/carwash_web/carwash_web/static/;
+        expires 30d;
+
+        location /carwash/static/ {
+            alias /home/ubuntu/carwash_web/carwash/static/;
+            expires 30d;
+        }
+
+        proxy_pass http://unix:/home/ubuntu/carwash_web/carwash_web/app.sock;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 400s;
+        proxy_send_timeout 400s;
+        proxy_read_timeout 400s;
+
+        proxy_cache my_cache;
+        proxy_cache_valid 200 302 180m;
+        proxy_cache_valid 404 1m;
+        proxy_cache_use_stale updating;
+    }
+
+
+   location /pdfs {
+        alias /home/ubuntu/pdfs/;
+        expires 30d;
+   }
+
+
+}

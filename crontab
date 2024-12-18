@@ -1,0 +1,15 @@
+*/50 * * * * /usr/bin/curl -s http://13.245.13.44/decision/crossvalidate/
+*/50 * * * * /usr/bin/curl -s http://13.245.13.44/decision/decisiontree/
+*/50 * * * * /usr/bin/curl -s http://13.245.13.44/decision/confusiondecision/
+
+*/50 * * * * /usr/bin/curl -s http://13.245.13.44/
+*/50 * * * * /usr/bin/curl -s http://13.245.13.44/decision/decisionfeatures/
+*/50 * * * * /usr/bin/curl -s http://13.245.13.44/logistic/features/
+
+*/60 * * * * /usr/bin/curl -s http://13.245.13.44/decision/confusioncmp/
+*/60 * * * * /usr/bin/curl -s http://13.245.13.44/decision/overfittingcmp/
+*/60 * * * * /usr/bin/curl -s http://13.245.13.44/decision/perfanlyticscmp/
+*/60 * * * * /usr/bin/curl -s http://13.245.13.44/decision/overfitting/
+*/60 * * * * /usr/bin/curl -s http://13.245.13.44/logistic/overfitting/
+*/60 * * * * /usr/bin/curl -s https://deploymentpy-pbeh5xkgzule48zdvuwr9w.streamlit.app/
+*/60 * * * * /usr/bin/curl -s https://classdeployedpy-bjw4uzjdm5ezhumufi2t2e.streamlit.app/
