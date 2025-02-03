@@ -46,12 +46,13 @@ Install `tf-nightly` via `pip install tf-nightly`.
 
 import os
 
-os.environ["KERAS_BACKEND"] = "tensorflow"  # or tensorflow, torch
+os.environ["KERAS_BACKEND"] = "jax"  # or tensorflow, torch
 
 import keras_hub
 
 import keras
 from keras import layers, ops
+from keras.layers import TextVectorization
 
 from dataclasses import dataclass
 import pandas as pd
@@ -155,14 +156,10 @@ def custom_standardization(input_data):
 From the `TextVectorization` [documentation](), it is recommended that we
 implement `TextVectorization` inside the `tf.data.Dataset`.We have tried
 to approximate the logic behind the TextVectorizer `adapt` method by creating
-the `get_vocabulary` function` - this function returns a vocabulary.
-
+the `get_vocabulary` function` - this function returns a vocabulary. We needed
+this vocabulary beacuse when trying to run adapt inside tf.data.Datset it 
+returns the error [](), and still after several fixes the error remians.
 """
-
-# `TextVectorizer` was returning errors such as,
-# ``,
-# and most attempts to fix it didn't yield a solution, so we 
-# proceeded to define get_vectorizer function to return vectorized texts.
 
 # Define a function to calculate the vocabulary
 def get_vocabulary(dataframe):
@@ -204,7 +201,7 @@ def get_vocabulary(dataframe):
     ]
     # Insert [mask] as a special token
     vocabulary = (
-        tokens[2 : len(tokens) - len(["[mask]"] + [""])] + ["[mask]"] + [""]
+        tokens[2 : len(tokens) - len(["[mask]"])] + ["[mask]"]
     )
     return vocabulary
 
@@ -217,22 +214,22 @@ token2id = {y: x for x, y in id2token.items()}
 
 
 # Define a function that vectorizes the text
-def get_vectorize_layer(dataframe):
+def get_vectorize_layer(features, target):
     """Build Text vectorization layer"""
 
-    tokens_ids = dataframe.review.apply(
-        lambda text: [token2id.get(token, token2id[""]) for token in text.split()]
-    )
-    # Pad the tokens list with [PAD] if necessary to make it MAX_LEN in length
-    padded_truncated_tokens = tokens_ids.apply(
-        lambda tokens: (
-            tokens[: config.MAX_LEN]
-            if len(tokens) > config.MAX_LEN
-            else tokens + [token2id[""]] * (config.MAX_LEN - len(tokens))
-        )
-    )
-    return padded_truncated_tokens
-
+    for feature_name in features:
+        if feature_name in FEATURES_WITH_VOCABULARY:
+            vectorize_layer = TextVectorization(
+                output_mode="int",
+                vocabulary=FEATURES_WITH_VOCABULARY["review"],
+                output_sequence_length=config.MAX_LEN,
+            )
+            vectorize_layer.get_vocabulary()
+            value_index = vectorize_layer(features[feature_name])
+            features[feature_name] = value_index
+        else:
+            pass
+    return dict(features), target
 
 # Define a function that retruns a dataset
 def get_dataset(x_train):
@@ -240,16 +237,15 @@ def get_dataset(x_train):
         labels = x_train.copy().pop("sentiment")
     else:
         labels = None
-    vectorized_text = get_vectorize_layer(x_train)
+    # vectorized_text = get_vectorize_layer(x_train)
     train_classifier_ds = tf.data.Dataset.from_tensor_slices(
-        (list(vectorized_text.values), labels)
-    )
+        (dict(x_train), labels)
+    ).map(get_vectorize_layer)
     return train_classifier_ds
 
 
 # Get mask token id
 mask_token_id = FEATURES_WITH_VOCABULARY["review"].index("[mask]")
-
 
 def get_masked_input_and_labels(encoded_texts):
     # 15% BERT masking
@@ -296,7 +292,8 @@ test_classifier_ds = get_dataset(test_df).shuffle(1000).batch(config.BATCH_SIZE)
 test_raw_classifier_ds = test_df
 
 # Prepare data for masked language model
-x_all_review = np.array([x[0] for x in get_dataset(all_data)])
+# all_data.loc[len(all_data)] = {"review": "I have watched this [mask] and it was awesome", "sentiment":1}
+x_all_review = np.array([x[0]["review"] for x in get_dataset(all_data)])
 x_masked_train, y_masked_labels, sample_weights = get_masked_input_and_labels(
     x_all_review
 )
@@ -556,15 +553,14 @@ class MaskedTextGenerator(keras.callbacks.Callback):
             }
             pprint(result)
 
-
 sample_tokens = "I have watched this [mask] and it was awesome"
 tokens_ids = [
-    token2id.get(x, token2id[""])
+    token2id.get(x, 0)
     for x in sample_tokens.split()
 ]
 # Pad the tokens list with zeros if necessary to make it 256 in length
 tokens_ids = tokens_ids[: config.MAX_LEN] + [
-    token2id[""]
+    0
 ] * (config.MAX_LEN - len(tokens_ids))
 # Convert the list to a tensor (with the batch size as 1)
 sample_tokens = np.reshape(tokens_ids, (1, -1))
@@ -601,7 +597,7 @@ pretrained_bert_model.trainable = False
 
 
 def create_classifier_bert_model():
-    inputs = layers.Input((config.MAX_LEN,), dtype="int32")
+    inputs = layers.Input((config.MAX_LEN,), dtype="int32", name="review")
     sequence_output = pretrained_bert_model(inputs)
     pooled_output = layers.GlobalMaxPooling1D()(sequence_output)
     hidden_layer = layers.Dense(64, activation="relu")(pooled_output)
