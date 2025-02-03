@@ -32,7 +32,7 @@ This example teaches you how to build a BERT model from scratch,
 train it with the masked language modeling task,
 and then fine-tune this model on a sentiment classification task.
 
-We will use the Keras `TextVectorization` and `MultiHeadAttention` layers
+We will use the Keras `MultiHeadAttention` layers
 to create a BERT Transformer-Encoder network architecture.
 
 Note: This example should be run with `tf-nightly`.
@@ -46,14 +46,12 @@ Install `tf-nightly` via `pip install tf-nightly`.
 
 import os
 
-os.environ["KERAS_BACKEND"] = "jax"  # or tensorflow, torch
+os.environ["KERAS_BACKEND"] = "tensorflow"  # or tensorflow, torch
 
 import keras_hub
 
 import keras
-from keras import layers
-from keras.layers import TextVectorization
-from keras.src.utils import tf_utils
+from keras import layers, ops
 
 from dataclasses import dataclass
 import pandas as pd
@@ -118,8 +116,8 @@ def get_data_from_text_files(folder_name):
     return df
 
 
-train_df = get_data_from_text_files("train").iloc[0:2000]
-test_df = get_data_from_text_files("test").iloc[0:1000]
+train_df = get_data_from_text_files("train").iloc[0:500]
+test_df = get_data_from_text_files("test").iloc[0:250]
 
 all_data = train_df._append(test_df)
 
@@ -155,14 +153,16 @@ def custom_standardization(input_data):
 ## Vocabulary Estimation
 
 From the `TextVectorization` [documentation](), it is recommended that we
-implement `TextVectorization` inside the `tf.data.Dataset`. To use `TextVectorizer` 
-successfully to avoid errors such as ``, we need to pass the vocabulary argument, using 
-the adapt method results in the above error -  The same applies to `StringLookup` layers.
-We have tried to approximate the logic behind the TextVectorizer `adapt` method by creating the 
-`get_vocabulary` function` - this function returns a vocabulary.
+implement `TextVectorization` inside the `tf.data.Dataset`.We have tried
+to approximate the logic behind the TextVectorizer `adapt` method by creating
+the `get_vocabulary` function` - this function returns a vocabulary.
 
 """
 
+# `TextVectorizer` was returning errors such as,
+# ``,
+# and most attempts to fix it didn't yield a solution, so we 
+# proceeded to define get_vectorizer function to return vectorized texts.
 
 # Define a function to calculate the vocabulary
 def get_vocabulary(dataframe):
@@ -203,39 +203,35 @@ def get_vocabulary(dataframe):
         for i in tokens.numpy().tolist()
     ]
     # Insert [mask] as a special token
-    vocabulary = tokens[0 : len(tokens) - len(["[mask]"])] + ["[mask]"]
+    vocabulary = (
+        tokens[2 : len(tokens) - len(["[mask]"] + [""])] + ["[mask]"] + [""]
+    )
     return vocabulary
 
 
 # Metadata
 FEATURES_WITH_VOCABULARY = {"review": get_vocabulary(all_data)}
 
+id2token = dict(enumerate(FEATURES_WITH_VOCABULARY["review"]))
+token2id = {y: x for x, y in id2token.items()}
 
-def get_vectorize_layer(features, target):
-    """Build Text vectorization layer
 
-    Args:
-      texts (list): List of string i.e input texts
-      vocab_size (int): vocab size
-      max_seq (int): Maximum sequence length.
-      special_tokens (list, optional): List of special tokens. Defaults to ['[MASK]'].
+# Define a function that vectorizes the text
+def get_vectorize_layer(dataframe):
+    """Build Text vectorization layer"""
 
-    Returns:
-        layers.Layer: Return TextVectorization Keras Layer
-    """
-
-    for feature_name in features:
-        if feature_name in FEATURES_WITH_VOCABULARY:
-            vectorize_layer = TextVectorization(
-                output_mode="int",
-                vocabulary=FEATURES_WITH_VOCABULARY[feature_name],
-                output_sequence_length=config.MAX_LEN,
-            )
-            value_index = vectorize_layer(features[feature_name])
-            features[feature_name] = value_index
-        else:
-            pass
-    return dict(features), target
+    tokens_ids = dataframe.review.apply(
+        lambda text: [token2id.get(token, token2id[""]) for token in text.split()]
+    )
+    # Pad the tokens list with [PAD] if necessary to make it MAX_LEN in length
+    padded_truncated_tokens = tokens_ids.apply(
+        lambda tokens: (
+            tokens[: config.MAX_LEN]
+            if len(tokens) > config.MAX_LEN
+            else tokens + [token2id[""]] * (config.MAX_LEN - len(tokens))
+        )
+    )
+    return padded_truncated_tokens
 
 
 # Define a function that retruns a dataset
@@ -244,9 +240,10 @@ def get_dataset(x_train):
         labels = x_train.copy().pop("sentiment")
     else:
         labels = None
+    vectorized_text = get_vectorize_layer(x_train)
     train_classifier_ds = tf.data.Dataset.from_tensor_slices(
-        (dict(x_train), labels)
-    ).map(get_vectorize_layer)
+        (list(vectorized_text.values), labels)
+    )
     return train_classifier_ds
 
 
@@ -293,16 +290,13 @@ def get_masked_input_and_labels(encoded_texts):
 train_classifier_ds = get_dataset(train_df).shuffle(1000).batch(config.BATCH_SIZE)
 
 # We have 25000 examples for testing
-train_classifier_ds = get_dataset(test_df).shuffle(1000).batch(config.BATCH_SIZE)
+test_classifier_ds = get_dataset(test_df).shuffle(1000).batch(config.BATCH_SIZE)
 
 # Build dataset for end to end model input (will be used at the end)
-y_test = test_df.sentiment.values
-test_raw_classifier_ds = tf.data.Dataset.from_tensor_slices(
-    (test_df.review.values, y_test)
-).batch(config.BATCH_SIZE)
+test_raw_classifier_ds = test_df
 
 # Prepare data for masked language model
-x_all_review = np.array([x[0]["review"] for x in get_dataset(all_data)])
+x_all_review = np.array([x[0] for x in get_dataset(all_data)])
 x_masked_train, y_masked_labels, sample_weights = get_masked_input_and_labels(
     x_all_review
 )
@@ -391,7 +385,6 @@ class MaskedLanguageModel(keras.Model):
     def _jax_train_step(self, state, inputs):
 
         import jax
-        import jax.numpy as jnp
 
         (
             trainable_variables,
@@ -451,26 +444,22 @@ class MaskedLanguageModel(keras.Model):
         return {"loss": logs["loss"]}, state
 
     def _tensorflow_train_step(self, inputs):
+
         if len(inputs) == 3:
             features, labels, sample_weight = inputs
         else:
             features, labels = inputs
             sample_weight = None
-
         with tf.GradientTape() as tape:
             predictions = self(features, training=True)
             loss = loss_fn(labels, predictions, sample_weight=sample_weight)
-
         # Compute gradients
         trainable_vars = self.trainable_variables
         gradients = tape.gradient(loss, trainable_vars)
-
         # Update weights
         self.optimizer.apply_gradients(zip(gradients, trainable_vars))
-
         # Compute our own metrics
         loss_tracker.update_state(loss, sample_weight=sample_weight)
-
         # Return a dict mapping metric names to current value
         return {"loss": loss_tracker.result()}
 
@@ -487,7 +476,6 @@ class MaskedLanguageModel(keras.Model):
         # Compute loss
         predictions = self(features, training=True)
         loss = loss_fn(labels, predictions, sample_weight=sample_weight)
-        # loss = loss.sum()
         # Call torch.Tensor.backward() on the loss to compute gradients
         # for the weights.
         loss.sum().backward()
@@ -497,10 +485,6 @@ class MaskedLanguageModel(keras.Model):
         with torch.no_grad():
             self.optimizer.apply(gradients, trainable_weights)
         # Compute our own metrics
-
-        import pdb
-        pdb.set_trace()
-
         loss_tracker.update_state(loss, sample_weight=sample_weight)
         # Return a dict mapping metric names to current value
         return {"loss": loss_tracker.result()}
@@ -517,31 +501,27 @@ class MaskedLanguageModel(keras.Model):
 
 def create_masked_language_bert_model():
     inputs = layers.Input((config.MAX_LEN,), dtype="int32")
-
+    # max_index = word_embeddings.input_dim - 1  # Clamp the indices
     word_embeddings = layers.Embedding(
         config.VOCAB_SIZE, config.EMBED_DIM, name="word_embedding"
-    )(inputs)
+    )
+    word_embeddings = word_embeddings(
+        keras.ops.clip(inputs, 0, (word_embeddings.input_dim - 1))
+    )
     position_embeddings = keras_hub.layers.PositionEmbedding(
         sequence_length=config.MAX_LEN
     )(word_embeddings)
     embeddings = word_embeddings + position_embeddings
-
     encoder_output = embeddings
     for i in range(config.NUM_LAYERS):
         encoder_output = bert_module(encoder_output, encoder_output, encoder_output, i)
-
     mlm_output = layers.Dense(config.VOCAB_SIZE, name="mlm_cls", activation="softmax")(
         encoder_output
     )
     mlm_model = MaskedLanguageModel(inputs, mlm_output, name="masked_bert_model")
-
     optimizer = keras.optimizers.Adam(learning_rate=config.LR)
     mlm_model.compile(optimizer=optimizer)
     return mlm_model
-
-
-id2token = dict(enumerate(get_vocabulary(all_data)))
-token2id = {y: x for x, y in id2token.items()}
 
 
 class MaskedTextGenerator(keras.callbacks.Callback):
@@ -556,22 +536,20 @@ class MaskedTextGenerator(keras.callbacks.Callback):
         return id2token[id]
 
     def on_epoch_end(self, epoch, logs=None):
-        prediction = self.model.predict(self.sample_tokens)
 
+        prediction = self.model.predict(self.sample_tokens)
         masked_index = np.where(self.sample_tokens == mask_token_id)
         masked_index = masked_index[1]
         mask_prediction = prediction[0][masked_index]
-
         top_indices = mask_prediction[0].argsort()[-self.k :][::-1]
         values = mask_prediction[0][top_indices]
-
         for i in range(len(top_indices)):
             p = top_indices[i]
             v = values[i]
             tokens = np.copy(sample_tokens[0])
             tokens[masked_index[0]] = p
             result = {
-                "input_text": self.decode(sample_tokens[0].numpy()),
+                "input_text": self.decode(sample_tokens[0]),
                 "prediction": self.decode(tokens),
                 "probability": v,
                 "predicted mask token": self.convert_ids_to_tokens(p),
@@ -579,24 +557,24 @@ class MaskedTextGenerator(keras.callbacks.Callback):
             pprint(result)
 
 
-sample_tokens = [
-    x
-    for x in get_dataset(
-        pd.DataFrame({"review": ["I have watched this [mask] and it was awesome"]})
-    ) # get_dataset only accepts dataframe objects as inputs
-][0][0]["review"].numpy()
-
+sample_tokens = "I have watched this [mask] and it was awesome"
+tokens_ids = [
+    token2id.get(x, token2id[""])
+    for x in sample_tokens.split()
+]
+# Pad the tokens list with zeros if necessary to make it 256 in length
+tokens_ids = tokens_ids[: config.MAX_LEN] + [
+    token2id[""]
+] * (config.MAX_LEN - len(tokens_ids))
+# Convert the list to a tensor (with the batch size as 1)
+sample_tokens = np.reshape(tokens_ids, (1, -1))
 generator_callback = MaskedTextGenerator(sample_tokens)
-
 bert_masked_model = create_masked_language_bert_model()
 bert_masked_model.summary()
 
 """
 ## Train and Save
 """
-
-import pdb
-pdb.set_trace()
 
 bert_masked_model.fit(mlm_ds, epochs=1, callbacks=[generator_callback])
 bert_masked_model.save("bert_mlm_imdb.keras")
@@ -609,9 +587,6 @@ To do this, let's create a classifier by adding a pooling layer and a `Dense` la
 pretrained BERT features.
 
 """
-
-import pdb
-pdb.set_trace()
 
 # Load pretrained bert model
 mlm_model = keras.models.load_model(
@@ -626,7 +601,7 @@ pretrained_bert_model.trainable = False
 
 
 def create_classifier_bert_model():
-    inputs = layers.Input((config.MAX_LEN,), dtype="int64")
+    inputs = layers.Input((config.MAX_LEN,), dtype="int32")
     sequence_output = pretrained_bert_model(inputs)
     pooled_output = layers.GlobalMaxPooling1D()(sequence_output)
     hidden_layer = layers.Dense(64, activation="relu")(pooled_output)
@@ -667,20 +642,23 @@ classifer_model.fit(
 When you want to deploy a model, it's best if it already includes its preprocessing
 pipeline, so that you don't have to reimplement the preprocessing logic in your
 production environment. Let's create an end-to-end model that incorporates
-the `TextVectorization` layer, and let's evaluate. Our model will accept raw strings
+the 'pre-processing', and let's evaluate. Our model will accept raw strings
 as input.
 """
 
-import pdb
-pdb.set_trace()
+# We create a custom Model to override th evaluate method so
+# that if first pre-process text data
+class ModelEndtoEnd(keras.Model):
+
+    def evaluate(self, inputs):
+        indices = get_dataset(inputs).shuffle(1000).batch(config.BATCH_SIZE)
+        return super().evaluate(indices)
 
 
 def get_end_to_end(model):
-    inputs_string = keras.Input(shape=(1,), dtype="string")
-    # indices = vectorize_layer(inputs_string)
-    indices = [x[0]["review"] for x in get_dataset(inputs_string)]
-    outputs = model(indices)
-    end_to_end_model = keras.Model(inputs_string, outputs, name="end_to_end_model")
+    inputs = classifer_model.inputs
+    outputs = classifer_model.outputs
+    end_to_end_model = ModelEndtoEnd(inputs, outputs, name="end_to_end_model")
     optimizer = keras.optimizers.Adam(learning_rate=config.LR)
     end_to_end_model.compile(
         optimizer=optimizer, loss="binary_crossentropy", metrics=["accuracy"]
