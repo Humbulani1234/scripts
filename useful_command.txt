@@ -1,0 +1,141 @@
+
+GPU CUDA COMPILATION:
+
+nvcc cuda_test.cu -gencode arch=compute_50,code=sm_50
+
+GENERAL
+
+zcat /var/log/apt/history.log.*.gz | cat - /var/log/apt/history.log | grep -Po '^Commandline: apt-get install (?!.*--reinstall)\K.*' # list installed packages\
+ by a user
+
+pip freeze | awk -F "==" '{ print $1 }' # list pip pckages without versions
+
+sudo apt-get install python3-dev default-libmysqlclient-dev build-essential\
+OR downgrade to version 2.0.0
+
+gdb python3 -ex "run ~/c_quant/python_ext.py"
+gdb --args ./argparse -f input.txt -o output.txt
+
+python -m venv env
+
+gcc -fpic -c carr_madan_ft.c  cuirai_heston_characfun.c  heston_trap_integration.c  integration_carrmadan_ft.c  struct_init.c -I ~/c_quant/include
+
+gcc -o libheston.so.1.2.3 carr_madan_ft.o  cuirai_heston_characfun.o  heston_trap_integration.o  integration_carrmadan_ft.o  struct_init.o -shared -Wl,-soname,libheston.so.1 -I ~/c_quant/include
+
+gcc ~/c_quant/testing_main.c -o practice  -I ~/c_quant/include -lm -lheston -L~/c_quant/lib,/usr/include
+gcc -fpic -c factorial.c -o factorial -I ~/CPython/cpython-main/Include
+gcc --shared -fpic c_class_ext.c -o my_module.so -I ~/CPython/cpython-main/Include -g # CORRECT SHARED
+
+MYSQL
+
+sudo tcpdump -i lo -n -s 0 -v -w mysql_packets.pcap port 3306 # for tcpdump mysql capture then open the files on wireshark
+mysql -u django_new_admin -pdjango_new_pass django_new_db
+mysql -u django_new_admin -pdjango_new_pass django_new_db -h 127.0.0.1 -P 3306
+
+mysqldump -u django_new_admin -pdjango_new_pass django_new_db -h 127.0.0.1 -P 3306 --no-data --compact logistic_features
+                                                                                                                    
+
+CPYTHON GDB COMPLEXITY
+
+ p *(*((PyTupleObject *)(((PyCodeObject *)f->f_executable)->co_names)->ob_type).ob_item) # example command to extract values
+ p *((PyLongObject *)(*(*(((PyTupleObject *) args)->ob_item)))->ob_type) # accessing args in c/python extension 
+ p *((((PyDictObject *)umd.u_consts)->ma_keys)->dk_indices) # Correctely accessed _PyCompile_CodeUnitMetadata *umd consts
+
+ p *((PyLongObject *)(*((PyTupleObject *)args).ob_item)) # NAILED IT, This syntax worked in accessing longobject
+C                                                         # digits from args to C extension (double deference)
+                                                            
+p (EagerTensor *)*((PyTupleObject *)grads).ob_item
+
+# TESTING CODE - DJANGO
+
+python -m unittest discover tests
+python -m unittest discover tests.<module.py>
+python -m unittest discover tests.<module.py>.<class name>.<method name>
+./runtests.py test_sqlite  migrations.test_loader  --parallel=1
+
+#GPU COMPILATION
+
+nvcc -gencode arch=compute_50,code=sm_50 hello.cu
+
+# TENSORFLOW
+
+pip: tensorflow[and-cuda], tensorflow_datasets, tensorflow_hub
+
+# HUGGING FACE
+
+pip: transformers, huggingface_hub, tokenizers
+
+# WORD COUNT SOURCE CODE
+
+find . -name "*.py" -exec wc -l {} +
+
+TESTING WITH PYTEST - PANDAS, NUMPY, ETC
+
+pytest test_algos.py --pdb # with assert 0 to fire up the debugger
+python -c "import pandas as pd; pd.test("pd.core.tests.test_algos")"
+pytest --trace <module> # works like charm
+
+GUNICORN TESTING
+
+pdb -m gunicorn django_ref.wsgi:application --workers=1 --bind=127.0.0.1:8000
+cd ~/django/env/lib/python3.10/site-packages/gunicorn/app
+gunicorn echo:app --workers=1 --config gunicorn.conf.py --access-logfile '-' --access-logformat '[%(p)s] %(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
+home/ubuntu/django-pd/env/bin/gunicorn --workers=2 --bind unix:/home/ubuntu/django-pd/django_ref/app.sock django_ref.wsgi:application --timeout 400
+
+
+MY AWS SITE:
+
+ssh -i ~/.ssh/ubuntu.pem ubuntu@13.245.13.44
+scp -i ~/.ssh/ubuntu.pem ./static/combined.pdf ubuntu@13.245.13.44:~/django-pd/django_ref/static
+/home/ubuntu/django-pd/env/bin/gunicorn --workers=2 --bind unix:/home/ubuntu/django-pd/django_ref/app.sock django_ref.wsgi:application --timeout 400
+
+
+CPYTHON BUILD
+
+./../configure --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=x86_64-linux-gnu --with-pydebug --prefix=/home/humbulani/cpython-main/python_build
+
+
+COMPILERS
+
+echo | ./xgcc -E -x c -v -
+export COMPILER_PATH="/path/to/new/gcc/bin:$COMPILER_PATH"
+gdb --args ./xgcc -o test test.c -g -fno-use-linker-plugin
+gcc -v -E - < /dev/null
+ldd --version
+gcc -print-search-dirs
+
+
+NUMPY, PANDAS AND SCIKIT LEARN BUILDING
+
+pip install --no-build-isolation --config-settings=editable-verbose=true -Csetup-args=-Dbuildtype=debug --editable .
+
+COMPILNG TENSORFLOW
+
+bazel build --copt=-g0   --per_file_copt=+tensorflow/python/*@-g   --per_file_copt=-tensorflow/core/kernels/*@-g   --per_file_copt=-tensorflow/compiler/*@-g   --per_file_copt=-tensorflow/cc/*@-g   --per_file_copt=-tensorflow/lite/*@-g   --per_file_copt=-tensorflow/dtensor/*@-g   --per_file_copt=+tensorflow/core/kernels/data/*@-g   --config=dbg   //tensorflow/tools/pip_package:build_pip_package --copt=-Wno-gnu-offsetof-extensions
+
+bazel build --copt=-g0 --per_file_copt=+tensorflow.*,-tensorflow/core/kernels.*@-g,-tensorflow/compiler.*@-g,-tensorflow/cc.*@-g,-tensorflow/lite.*@-g,-tensorflow/dtensor.*@-g,-tensorflow/distribute.*@-g +tensorflow/python.*@-g --config=dbg --per_file_copt=+tensorflow/core/kernels/data.*@-g //tensorflow/tools/pip_package:wheel --repo_env=WHEEL_NAME=tensorflow_cpu // somehow a smaller binary generated
+
+bazel build --copt=-g0 --per_file_copt=+third_party/*@-g --per_file_copt=+tensorflow/core/kernels/identity_op.cc@-g --per_file_copt=+tensorflow/core/kernels/aggregate_ops_gpu.cu.cc@-g --per_file_copt=-tensorflow/*@-g --config=dbg //tensorflow/tools/pip_package:build_pip_package --copt=-Wno-gnu-offsetof-extensions
+
+
+./bazel-bin/tensorflow/tools/pip_package/build_pip_package /tmp/tensorflow_pkg2
+pip install tensorflow-2.15.1-cp310-cp310-linux_x86_64.whl
+objcopy --only-keep-debug libtensorflow_cc.so.2 tensorflow.so.debug
+strip --strip-debug libtensorflow_cc.so.2
+strip --strip-all libtensorflow_cc.so.2 
+
+ensure the compiled binary access the source code used to cmpile it
+gdb python -ex "run ~/tensorflow-env/humbu/test.py" # FILE FROM ANOTHER DIR
+gdb frame # CURRENT LOCATION
+
+TENSORFLOW SERVING AND DOCKER
+
+sudo docker run -it --rm -p 8500:8500 -p 8501:8501 -v "$HOME/keras-io/examples/structured_data/scratch:/models/scratch" -e "MODEL_NAME=scratch" tensorflow/serving:latest
+
+docker ps
+docker images
+docker prune
+
+GNU stdlibc++
+
+svn checkout svn://gcc.gnu.org/svn/gcc/trunk/libstdc++-v3 libstdc++ #svn=subversion
