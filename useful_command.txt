@@ -121,6 +121,8 @@ bazel build --copt=-g0 --per_file_copt=+third_party/xla/third_party/tsl/tsl.*@-g
 
 bazel build --copt=-g0 --per_file_copt=+tensorflow/core/framework/*@-g --per_file_copt=+tensorflow/core/common_runtime/*@-g --per_file_copt=+tensorflow/core/kernels/identity_op.*@-g --per_file_copt=+tensorflow/c/c_api.*@-g --per_file_copt=+tensorflow/c/tf*@-g --per_file_copt=+tensorflow/c/env.*@-g --per_file_copt=+tensorflow/c/eager/*@-g --per_file_copt=+tensorflow/core/kernels/aggregate_ops_gpu.cu.*@-g--per_file_copt=+tensorflow/core/kernels/reshape.*@-g --per_file_copt=+tensorflow/core/platform/*@-g --config=dbg //tensorflow/tools/pip_package:build_pip_package --copt=-Wno-gnu-offsetof-extensions
 
+azel build --copt=-g0 --per_file_copt=+tensorflow/core/framework/*@-g --per_file_copt=+tensorflow/python/*@-g --per_file_copt=+tensorflow/core/common_runtime/*@-g --per_file_copt=+tensorflow/core/kernels/identity_op.*@-g --per_file_copt=+tensorflow/core/kernels/data/*@-g --per_file_copt=+tensorflow/c/c_api.*@-g --per_file_copt=+tensorflow/c/tf*@-g --per_file_copt=+tensorflow/c/env.*@-g --per_file_copt=+tensorflow/c/eager/*@-g --per_file_copt=+tensorflow/core/kernels/aggregate_ops_gpu.cu.*@-g--per_file_copt=+tensorflow/core/kernels/reshape.*@-g --per_file_copt=+tensorflow/core/platform/*@-g --config=dbg //tensorflow/tools/pip_package:build_pip_package --copt=-Wno-gnu-offsetof-extensions
+
 
 ./bazel-bin/tensorflow/tools/pip_package/build_pip_package /tmp/tensorflow_pkg2
 pip install tensorflow-2.15.1-cp310-cp310-linux_x86_64.whl
